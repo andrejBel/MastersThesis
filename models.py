@@ -11,7 +11,7 @@ from tensorflow.keras.models import Model, Sequential
 
 class Models:
 
-    def __init__(self, autoencoder, classifier, autoclassifier):
+    def __init__(self, autoencoder: Model, classifier: Model, autoclassifier: Model):
         self.autoencoder = autoencoder
         self.classifier = classifier
         self.auto_classifier = autoclassifier
@@ -60,7 +60,7 @@ class BasicModelBuilder:
                    name=Constants.Models.DECODED_OUT)(d)  # 28 x 28 x 1
         return d
 
-    def get_fully_connected(self, enco):
+    def get_fully_connected(self, enco: layers.Layer):
         flat = Flatten()(enco)
         den = Dense(128, activation='relu')(flat)
         den = Dropout(0.3)(den)
@@ -76,40 +76,41 @@ class BasicModelBuilder:
         decoder = Model(inputs=encoder_output_shape, outputs=self.get_decoder(encoder_output_shape), name='DECODER')
         classifier_head = Model(inputs=encoder_output_shape, outputs=self.get_fully_connected(encoder_output_shape),
                                 name='CLASSIFIER_HEAD')
-        autoencoder = Sequential([encoder, decoder], name=Constants.Models. DECODED_OUT)
+        autoencoder = Sequential([encoder, decoder], name=Constants.Models.DECODED_OUT)
         classifier = Sequential([encoder, classifier_head], name=Constants.Models.CLASSIFIER_OUT)
         auto_classifier = Model(inputs=input_shape, outputs=[autoencoder(input_shape), classifier(input_shape)],
                                 name='auto_classifier')
         return Models(autoencoder, classifier, auto_classifier)
 
-    def compile_models(self, models : Models):
+    def compile_models(self, models: Models):
         models.autoencoder.compile(loss=keras.losses.binary_crossentropy, optimizer=keras.optimizers.RMSprop())
         models.classifier.compile(loss=keras.losses.categorical_crossentropy, optimizer=keras.optimizers.Adam(),
-                           metrics=['accuracy'])
+                                  metrics=['accuracy'])
         models.auto_classifier.compile(
-            loss={Constants.Models.DECODED_OUT: keras.losses.binary_crossentropy,  Constants.Models.CLASSIFIER_OUT: keras.losses.categorical_crossentropy},
+            loss={Constants.Models.DECODED_OUT: keras.losses.binary_crossentropy,
+                  Constants.Models.CLASSIFIER_OUT: keras.losses.categorical_crossentropy},
             loss_weights={Constants.Models.DECODED_OUT: 1.0, Constants.Models.CLASSIFIER_OUT: 2.0},
-            optimizers={Constants.Models.DECODED_OUT: keras.optimizers.RMSprop(), Constants.Models.CLASSIFIER_OUT: keras.optimizers.RMSprop()},
+            optimizers={Constants.Models.DECODED_OUT: keras.optimizers.RMSprop(),
+                        Constants.Models.CLASSIFIER_OUT: keras.optimizers.RMSprop()},
             metrics=["accuracy"]
         )
-
-
 
     def add_methods_to_models(self, models: Models):
         def set_autoencoder_trainable(selfinner, innervalue):
             for layer in selfinner.layers:
                 layer.trainable = innervalue
-        models.autoencoder.set_autoencoder_trainable = bind_method_to_instance(models.autoencoder, set_autoencoder_trainable)
 
+        models.autoencoder.set_autoencoder_trainable = bind_method_to_instance(models.autoencoder,
+                                                                               set_autoencoder_trainable)
 
         def set_autoencoder_layers_trainable(selfinner, innervalue):
             for layer in selfinner.layers:
                 layer.trainable = innervalue
                 if layer.name == Constants.Models.ENCODED_OUT:
                     break
-        models.classifier.set_autoencoder_layers_trainable = bind_method_to_instance(models.classifier, set_autoencoder_layers_trainable)
 
-
+        models.classifier.set_autoencoder_layers_trainable = bind_method_to_instance(models.classifier,
+                                                                                     set_autoencoder_layers_trainable)
 
     def create_models(self) -> Models:
         input_shape = Input(shape=self.input_shape, name=Constants.Models.INPUT_SHAPE)
@@ -125,8 +126,9 @@ class BasicModelBuilder:
         self.add_methods_to_models(models)
         return models
 
+
 import datasets
-models = BasicModelBuilder(datasets.MnistDataset().get_input_shape(), datasets.MnistDataset().get_number_of_classes()).create_models()
+
+models = BasicModelBuilder(datasets.MnistDataset().get_input_shape(),
+                           datasets.MnistDataset().get_number_of_classes()).create_models()
 models.classifier.set_autoencoder_layers_trainable(False)
-
-
