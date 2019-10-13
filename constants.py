@@ -1,6 +1,5 @@
 import named_constants
 
-
 class Constants(named_constants.Constants):
     class Datasets(named_constants.Constants):
         MNIST, FASHION_MNIST, CIFAR_10 = range(3)
@@ -11,6 +10,9 @@ class Constants(named_constants.Constants):
     class GpuConfig(named_constants.Constants):
         DEFAULT, LIMIT, CONTINOUS_GROWTH = range(3)
 
+    class Models(named_constants.Constants):
+        ENCODED_OUT = 'ENCODED_OUT'
+        DECODED_OUT = 'DECODED_OUT'
+        CLASSIFIER_OUT = 'CLASSIFIER_OUT'
+        INPUT_SHAPE = 'INPUT_SHAPE'
 
-
-print(Constants.Paths.OUTPUT_DIRECTORY)
