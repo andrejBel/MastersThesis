@@ -105,3 +105,4 @@ venv.bak/
 
 # My ignores
 output_dir/
+.idea/
