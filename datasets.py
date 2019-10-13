@@ -12,7 +12,7 @@ class Dataset(ABC):
         pass
 
     @abstractmethod
-    def get_number_of_classes(self):
+    def get_number_of_classes(self) -> int:
         pass
 
     @abstractmethod
@@ -33,8 +33,6 @@ class Dataset(ABC):
         pass
 
     def get_train_labels_one_hot(self):
-        numclasses = self.get_number_of_classes()
-        print('numclasses ', numclasses)
         keras.utils.to_categorical(self.get_train_labels(), self.get_number_of_classes())
 
     @abstractmethod
@@ -48,6 +46,12 @@ class Dataset(ABC):
     @abstractmethod
     def get_classes_names(self):
         pass
+
+    def get_train_label_class_name(self, picture_index):
+      return self.get_classes_names()[self.get_train_labels()[picture_index]]
+
+    def get_test_label_class_name(self, picture_index):
+      return self.get_classes_names()[self.get_test_labels()[picture_index]]
 
     def get_test_labels_one_hot(self):
         keras.utils.to_categorical(self.get_test_labels(), Dataset.get_number_of_classes())
@@ -63,6 +67,7 @@ class Dataset(ABC):
         else:
             return image
 
+    
 
 class KerasDataset(Dataset):
 
@@ -72,6 +77,9 @@ class KerasDataset(Dataset):
         self.preprocess_images()
 
     def preprocess_images(self):
+        self.train_images = self.train_images.reshape(self.train_images.shape[0], self.train_images.shape[1], self.train_images.shape[2], -1)
+        self.test_images = self.test_images.reshape(self.test_images.shape[0], self.test_images.shape[1], self.test_images.shape[2], -1)
+
         self.train_images = self.train_images / 255.0
         self.test_images = self.test_images / 255.0
 
@@ -97,7 +105,7 @@ class MnistDataset(KerasDataset):
         return ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight',
                 'Nine']
 
-    def get_number_of_classes(self):
+    def get_number_of_classes(self) -> int:
         return 10
 
     def get_dataset_name(self):
@@ -113,7 +121,7 @@ class FashionMnistDataset(KerasDataset):
         return ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker', 'Bag',
                 'Ankle boot']
 
-    def get_number_of_classes(self):
+    def get_number_of_classes(self) -> int:
         return 10
 
     def get_dataset_name(self):
@@ -128,7 +136,7 @@ class Cifar10Dataset(KerasDataset):
     def get_classes_names(self):
         return ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
 
-    def get_number_of_classes(self):
+    def get_number_of_classes(self) -> int:
         return 10
 
     def get_dataset_name(self):
@@ -151,3 +159,4 @@ class DatasetFactory:
         if not maker:
             raise ValueError(type)
         return maker()
+
