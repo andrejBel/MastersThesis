@@ -8,5 +8,3 @@ class Config():
         IS_LINUX = True
 
     GPU_CONFIG = Constants.GpuConfig.LIMIT
-
-print(Config.IS_LINUX)
