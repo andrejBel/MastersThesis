@@ -1,14 +1,14 @@
 from constants import Constants
 
-from global_functions import bind_method_to_instance
+from global_functions import *
+from datasets import Dataset
 
-from tensorflow import keras
-from tensorflow.keras import datasets, layers, models
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Reshape, UpSampling2D, Input, BatchNormalization, \
-    Dense, Dropout
+from tensorflow.keras import datasets, layers, models, losses, optimizers
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Reshape, UpSampling2D, Input, BatchNormalization, Dense, Dropout
 from tensorflow.keras.models import Model, Sequential
 
 
+@auto_str_repr
 class Models:
 
     def __init__(self, autoencoder: Model, classifier: Model, autoclassifier: Model):
@@ -16,6 +16,11 @@ class Models:
         self.classifier = classifier
         self.auto_classifier = autoclassifier
 
+    def get_models_as_list(self):
+        return [self.autoencoder, self.classifier, self.auto_classifier]
+
+    def __iter__(self):
+        return [self.autoencoder, self.classifier, self.auto_classifier].__iter__()
 
 class BasicModelBuilder:
 
@@ -83,15 +88,15 @@ class BasicModelBuilder:
         return Models(autoencoder, classifier, auto_classifier)
 
     def compile_models(self, models: Models):
-        models.autoencoder.compile(loss=keras.losses.binary_crossentropy, optimizer=keras.optimizers.RMSprop())
-        models.classifier.compile(loss=keras.losses.categorical_crossentropy, optimizer=keras.optimizers.Adam(),
+        models.autoencoder.compile(loss=losses.binary_crossentropy, optimizer=optimizers.RMSprop())
+        models.classifier.compile(loss=losses.categorical_crossentropy, optimizer=optimizers.Adam(),
                                   metrics=['accuracy'])
         models.auto_classifier.compile(
-            loss={Constants.Models.DECODED_OUT: keras.losses.binary_crossentropy,
-                  Constants.Models.CLASSIFIER_OUT: keras.losses.categorical_crossentropy},
+            loss={Constants.Models.DECODED_OUT: losses.binary_crossentropy,
+                  Constants.Models.CLASSIFIER_OUT: losses.categorical_crossentropy},
             loss_weights={Constants.Models.DECODED_OUT: 1.0, Constants.Models.CLASSIFIER_OUT: 2.0},
-            optimizers={Constants.Models.DECODED_OUT: keras.optimizers.RMSprop(),
-                        Constants.Models.CLASSIFIER_OUT: keras.optimizers.RMSprop()},
+            optimizers={Constants.Models.DECODED_OUT: optimizers.RMSprop(),
+                        Constants.Models.CLASSIFIER_OUT: optimizers.RMSprop()},
             metrics=["accuracy"]
         )
 
@@ -116,16 +121,19 @@ class BasicModelBuilder:
         input_shape = Input(shape=self.input_shape, name=Constants.Models.INPUT_SHAPE)
         encoder = self.get_encoder(input_shape)
         decoder_output = self.get_decoder(encoder)
-        autoencoder = Model(input_shape, decoder_output)
+        autoencoder = Model(input_shape, decoder_output, name = Constants.Models.AUTOENCODER)
         fully_connected_output = self.get_fully_connected(encoder)
-        classifier = Model(input_shape, fully_connected_output)
-        auto_classifier = Model(inputs=input_shape, outputs=[autoencoder.outputs, fully_connected_output])
+        classifier = Model(input_shape, fully_connected_output, name = Constants.Models.CLASSIFIER)
+        auto_classifier = Model(inputs=input_shape, outputs=[autoencoder.outputs, fully_connected_output], name = Constants.Models.AUTO_CLASSIFIER)
 
         models = Models(autoencoder, classifier, auto_classifier)
         self.compile_models(models)
         self.add_methods_to_models(models)
         return models
 
+    @staticmethod
+    def from_dataset(dataset: Dataset):
+        return BasicModelBuilder(input_shape = dataset.get_input_shape(), number_of_classes = dataset.get_number_of_classes())
 
 import datasets
 
