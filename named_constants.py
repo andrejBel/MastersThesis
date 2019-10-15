@@ -1,5 +1,7 @@
 import sys, inspect
 
+#https://github.com/hmeine/named_constants
+
 # ---------------------------------------------------------------------
 # python 2 / 3 compatibility stuff
 
