@@ -1,11 +1,10 @@
-import named_constants
-
 class MetaConst(type):
     def __getattr__(cls, key):
-        return cls[key]
+        raise Exception(key + " not found!")
 
     def __setattr__(cls, key, value):
         raise TypeError
+
 
 class Const(metaclass=MetaConst):
     def __getattr__(self, name):
@@ -14,39 +13,51 @@ class Const(metaclass=MetaConst):
     def __setattr__(self, name, value):
         raise TypeError
 
-class Constants(Const):
-    class Datasets(Const):
-        MNIST = 'MNIST'
-        FASHION_MNIST = 'FASHION_MNIST'
-        CIFAR_10 = 'CIFAR_10'
 
-    class Paths(Const):
-        OUTPUT_DIRECTORY = './output_dir/'
+class Paths(Const):
+    OUTPUT_DIRECTORY = './output_dir/'
 
-    class GpuConfig(Const):
-        DEFAULT, LIMIT, CONTINOUS_GROWTH = range(3)
 
-    class Models(Const):
-        AUTOENCODER = 'autoencoder'
-        CLASSIFIER = 'classifier'
-        AUTO_CLASSIFIER = 'auto_classifier'
-        ENCODED_OUT = 'ENCODED_OUT'
-        DECODED_OUT = 'DECODED_OUT'
-        CLASSIFIER_OUT = 'CLASSIFIER_OUT'
-        INPUT_SHAPE = 'INPUT_SHAPE'
+class Datasets(Const):
+    MNIST = 'MNIST'
+    FASHION_MNIST = 'FASHION_MNIST'
+    CIFAR_10 = 'CIFAR_10'
 
-    class Experiments(Const):
-        PATIENCE = 20
-        AUTOENCODER = 'AUTOENCODER'
-        CLASSIFIER = 'CLASSIFIER'
-        AE_CL_AU_L_OFF = 'AUTOENCODER_CLASSIFIER_AUTOENCODER_LAYERS_OFF'
-        AE_CL_AU_L_ON = 'AUTOENCODER_CLASSIFIER_AUTOENCODER_LAYERS_ON'
 
-    class Metrics(Const):
-        ACCURACY = 'acc'
-        LOSS = 'loss'
-        VAL_LOSS = 'val_loss'
-        VAL_ACCURACY = 'val_accuracy'
+class GpuConfig(Const):
+    DEFAULT, LIMIT, CONTINOUS_GROWTH = range(3)
 
-    class Logger(Const):
-        ROOT_KEY = 'modellist'
+
+class Models(Const):
+    AUTOENCODER = 'autoencoder'
+    CLASSIFIER = 'classifier'
+    AUTO_CLASSIFIER = 'auto_classifier'
+    ENCODED_OUT = 'ENCODED_OUT'
+    DECODED_OUT = 'DECODED_OUT'
+    CLASSIFIER_OUT = 'CLASSIFIER_OUT'
+    INPUT_SHAPE = 'INPUT_SHAPE'
+
+
+class ExperimentsPaths(Const):
+    class FashionMnist:
+        FASHION_MNIST_POSTFIX = '_fm.json'
+        AUTOENCODER = Paths.OUTPUT_DIRECTORY + 'autoencoder' + FASHION_MNIST_POSTFIX  # 1
+        CLASSIFIER = Paths.OUTPUT_DIRECTORY + 'classifier' + FASHION_MNIST_POSTFIX  # 2
+        AUTOENCODER1_CLASSIFIER1_AUTO_L_OFF = Paths.OUTPUT_DIRECTORY + 'autoencoder1_classifier1_auto_l_off' + FASHION_MNIST_POSTFIX  # 3
+        AUTOENCODER1_CLASSIFIER1_AUTO_L_ON = Paths.OUTPUT_DIRECTORY + 'autoencoder1_classifier1_auto_l_on' + FASHION_MNIST_POSTFIX  # 4
+        AUTOENCODER_TRAINED_CLASSIFIER_AUTO_L_OFF = Paths.OUTPUT_DIRECTORY + 'autoencoder_trained_classifier_auto_l_off' + FASHION_MNIST_POSTFIX  # 5
+        AUTOENCODER_TRAINED_CLASSIFIER_AUTO_L_ON = Paths.OUTPUT_DIRECTORY + 'autoencoder_trained_classifier_auto_l_on' + FASHION_MNIST_POSTFIX  # 6
+        AUTO_CLASSIFIER = Paths.OUTPUT_DIRECTORY + 'autoclassifier' + FASHION_MNIST_POSTFIX #7
+
+    class Mnist:
+        MNIST_POSTFIX = '_m.json'
+        AUTOENCODER = Paths.OUTPUT_DIRECTORY + 'autoencoder' + MNIST_POSTFIX  # 1
+        CLASSIFIER = Paths.OUTPUT_DIRECTORY + 'classifier' + MNIST_POSTFIX  # 2
+
+
+class Metrics(Const):
+    ACCURACY = 'acc'
+    LOSS = 'loss'
+    VAL_LOSS = 'val_loss'
+    VAL_ACCURACY = 'val_accuracy'
+    VAL_CLASSIFIER_OUT_ACCURACY = 'val_' + Models.CLASSIFIER_OUT + '_accuracy'
