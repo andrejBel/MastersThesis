@@ -70,3 +70,19 @@ class Vizualizer():
             ax.get_xaxis().set_visible(False)
             ax.get_yaxis().set_visible(False)
         plt.show()
+
+    @staticmethod
+    def plot_bins(predictions, number_of_bins):
+        import numpy as np
+        import matplotlib.pyplot as plt
+        bins = np.linspace(predictions.min() - 0.01, predictions.max() + 0.01, num=number_of_bins)
+
+        print(bins)
+        fig, ax = plt.subplots(1, 1)
+        hist = ax.hist(predictions, bins=bins)
+        labels = [str(count) for count in hist[0]]
+        # labels.insert(0, 0)
+        print(labels)
+        # ax.set_xticklabels(labels)
+        plt.show()
+        return bins, labels
