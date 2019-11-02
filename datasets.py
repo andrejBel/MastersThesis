@@ -2,11 +2,12 @@ from abc import ABC, abstractmethod
 
 from tensorflow.keras import datasets
 import numpy as np
+import tensorflow.keras as keras
 
 from global_functions import run_once
-from constants import Constants
+import constants
 
-from typing import List, Tuple
+from typing import List, Tuple, Callable
 
 class Dataset(ABC):
 
@@ -111,7 +112,7 @@ class MnistDataset(KerasDataset):
         return 10
 
     def get_dataset_name(self) -> str:
-        return Constants.Datasets.MNIST
+        return constants.Datasets.MNIST
 
 class FashionMnistDataset(KerasDataset):
 
@@ -126,7 +127,7 @@ class FashionMnistDataset(KerasDataset):
         return 10
 
     def get_dataset_name(self) -> str:
-        return Constants.Datasets.FASHION_MNIST
+        return constants.Datasets.FASHION_MNIST
 
 
 class Cifar10Dataset(KerasDataset):
@@ -141,7 +142,7 @@ class Cifar10Dataset(KerasDataset):
         return 10
 
     def get_dataset_name(self) -> str:
-        return Constants.Datasets.CIFAR_10
+        return constants.Datasets.CIFAR_10
 
 
 
@@ -149,9 +150,9 @@ class DatasetFactory:
 
     def __init__(self):
         self.dataset_makers = {}
-        self.register_dataset(Constants.Datasets.MNIST, MnistDataset)
-        self.register_dataset(Constants.Datasets.FASHION_MNIST, FashionMnistDataset)
-        self.register_dataset(Constants.Datasets.CIFAR_10, Cifar10Dataset)
+        self.register_dataset(constants.Datasets.MNIST, MnistDataset)
+        self.register_dataset(constants.Datasets.FASHION_MNIST, FashionMnistDataset)
+        self.register_dataset(constants.Datasets.CIFAR_10, Cifar10Dataset)
 
     def register_dataset(self, name : str, maker):
         self.dataset_makers[name] = maker
@@ -161,4 +162,15 @@ class DatasetFactory:
         if not maker:
             raise ValueError(type)
         return maker()
+
+
+DatasetProvider = Callable[[], Dataset]
+
+class DatasetProviderClass():
+
+    def __init__(self, provider: DatasetProvider):
+        self.provider: DatasetProvider = provider
+
+    def __call__(self) -> Dataset:
+        return self.provider()
 
