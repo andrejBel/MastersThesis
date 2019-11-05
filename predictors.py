@@ -12,8 +12,10 @@ class Predictor(ABC):
         return self.predict(dataset.get_test_images(), dataset.get_test_labels(), model, threashold)
 
     def predict_test_based_on_train_treshoald(self, dataset, model, percentile):
+        print("Predict train")
         _, distance_train = self.predict_train(dataset, model)
         threashold_for_test = np.percentile(distance_train, percentile)
+        print("Predict test")
         return self.predict_test(dataset, model, threashold_for_test), threashold_for_test
 
     @abstractmethod
@@ -28,6 +30,7 @@ class Predictor(ABC):
         for predictor in predictors:
             print(predictor.__name__)
             instance = predictor()
+
             (_, __), threashoald = instance.predict_test_based_on_train_treshoald(dataset_for_threashold,
                                                                                   model, percentile)
             threashoald_list.append(threashoald)
@@ -35,6 +38,7 @@ class Predictor(ABC):
             print(predictor.__name__)
             instance = predictor()
             print("Threashold: ", threashoald_list[index])
+            print("Test:")
             instance.predict_test(dataset_for_test, model, threashoald_list[index])
 
 class AbsDistanceFromPredicted(Predictor):
@@ -132,4 +136,4 @@ class MaxArgPredictor(Predictor):
         return my_classes, predictions
 
 
-Predictor.predict_for_subclasses(None, None, None, None)
+#Predictor.predict_for_subclasses(None, None, None, None)
