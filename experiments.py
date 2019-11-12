@@ -259,8 +259,19 @@ class ExperimentAutoencoder(ExperimentBase):
         return evaluation
 
     @staticmethod
+    def evaluate_on_train(dataset: Dataset, models: Models):
+        evaluation = models.autoencoder.evaluate(x=dataset.get_train_images(), y=dataset.get_train_images(), verbose=2)
+        print(evaluation)
+        return evaluation
+
+    @staticmethod
     def predict_test(dataset: Dataset, models: Models):
         predictions = models.autoencoder.predict(dataset.get_test_images(), verbose=2)
+        return predictions
+
+    @staticmethod
+    def predict_train(dataset: Dataset, models: Models):
+        predictions = models.autoencoder.predict(dataset.get_train_images(), verbose=2)
         return predictions
 
     @staticmethod
