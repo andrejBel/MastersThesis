@@ -339,8 +339,8 @@ class ExperimentClassifier(ExperimentBase):
         predictions = models.classifier.predict(dataset.get_test_images(), verbose=2)
         predictions_out = predictions.copy()
 
-        predictions = np.argmax(np.round(predictions), axis=1)
-        predictions = predictions.astype('uint8')
+        predictions = np.argmax(predictions, axis=1)
+        #predictions = predictions.astype('uint8')
         correct = [predictions[i] == value for i, value in enumerate(dataset.get_test_labels())]
         print("Correct: {}".format(correct.count(True)))
         return predictions_out
