@@ -48,6 +48,7 @@ class ExperimentsPaths(Const):
         AUTOENCODER_TRAINED_CLASSIFIER_AUTO_L_OFF = Paths.OUTPUT_DIRECTORY + 'autoencoder_trained_classifier_auto_l_off' + FASHION_MNIST_POSTFIX  # 5
         AUTOENCODER_TRAINED_CLASSIFIER_AUTO_L_ON = Paths.OUTPUT_DIRECTORY + 'autoencoder_trained_classifier_auto_l_on' + FASHION_MNIST_POSTFIX  # 6
         AUTO_CLASSIFIER = Paths.OUTPUT_DIRECTORY + 'autoclassifier' + FASHION_MNIST_POSTFIX #7
+        CLASSIFIER_LAYERS_OFF = Paths.OUTPUT_DIRECTORY + 'classifier_layers_off' + FASHION_MNIST_POSTFIX #8
 
     class Mnist:
         MNIST_POSTFIX = '_m.json'
@@ -61,3 +62,4 @@ class Metrics(Const):
     VAL_LOSS = 'val_loss'
     VAL_ACCURACY = 'val_accuracy'
     VAL_CLASSIFIER_OUT_ACCURACY = 'val_' + Models.CLASSIFIER_OUT + '_accuracy'
+    VAL_AUTOENCODER_OUT_LOSS = 'val_' + Models.DECODED_OUT + '_loss'
