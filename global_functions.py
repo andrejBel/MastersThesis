@@ -63,7 +63,6 @@ def on_start():
         #!pip install jsonpickle #1.2
     import tensorflow as tf
     gpus = tf.config.experimental.list_physical_devices('GPU')
-    import tensorflow as tf
     if gpus:
         if Config.GPU_CONFIG is constants.GpuConfig.CONTINOUS_GROWTH:
             tf.config.experimental.set_memory_growth(device=gpus[0], enable=True)
