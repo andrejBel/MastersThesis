@@ -67,6 +67,21 @@ class TrainingFashionMnist():
             experiment_results.append(result)
         return experiment_results
 
+    # 8
+    @staticmethod
+    @execute_before(on_start)
+    def classifier_layers_off():
+        experiment_results = []
+        for rate in [0.1, 0.25, 0.5, 1]:
+            exp = experiments.ExperimentClassifier(datasets.FashionMnistDataset, models.BasicModelProvider(),
+                                                   training_data.BasicTrainingDataGeneratorClassifier())
+            result = exp.train(training_data.BasicTrainParametersClassifier(100, 128, 20, True, rate, 1e-6, False,
+                                                                            constants.ExperimentsPaths.FashionMnist.CLASSIFIER_LAYERS_OFF,
+                                                                            True)
+                               )
+            experiment_results.append(result)
+        return experiment_results
+
     # 3, 4
     @staticmethod
     @execute_before(on_start)
