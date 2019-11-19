@@ -22,9 +22,6 @@ class Models:
         self.add_methods_to_models()
         self.compile_models()
 
-    def get_models_as_list(self):
-        return [self.autoencoder, self.classifier, self.auto_classifier]
-
     def compile_models(self, loss_weigh_decoder = 1.0, loss_weight_classifier = 2.0):
         self.autoencoder.compile(loss=losses.binary_crossentropy, optimizer=optimizers.RMSprop())
         self.classifier.compile(loss=losses.categorical_crossentropy, optimizer=optimizers.Adam(),
@@ -34,7 +31,7 @@ class Models:
                   constants.Models.CLASSIFIER_OUT: losses.categorical_crossentropy},
             loss_weights={constants.Models.DECODED_OUT: 1.0, constants.Models.CLASSIFIER_OUT: 2.0},
             optimizers={constants.Models.DECODED_OUT: optimizers.RMSprop(),
-                        constants.Models.CLASSIFIER_OUT: optimizers.RMSprop()},
+                        constants.Models.CLASSIFIER_OUT: optimizers.Adam()},
             metrics=["accuracy"]
         )
 
@@ -77,6 +74,77 @@ class Models:
         self.compile_models()
 
 
+class SmallModelBuilder:
+
+    def __init__(self, input_shape, number_of_classes: int):
+        self.activation = 'relu'
+        self.input_shape = input_shape
+        self.number_of_classes = number_of_classes
+
+    def get_encoder(self, input_img: Input):
+        # encoder
+        e = Conv2D(32, (3, 3), activation=self.activation, padding='same')(input_img)
+        e = BatchNormalization()(e)
+        e = MaxPooling2D(pool_size=(2, 2))(e)
+        e = Conv2D(32, (3, 3), activation=self.activation, padding='same')(e)
+        e = BatchNormalization()(e)
+        e = MaxPooling2D(pool_size=(2, 2)) (e)
+        e = Dropout(0.1) (e)
+        print('Nove OK')
+        return e
+
+    def get_decoder(self, encoded):
+        # decoder
+        d = Conv2D(32, (3, 3), activation=self.activation, padding='same')(encoded)
+        d = BatchNormalization()(d)
+        d = UpSampling2D((2, 2))(d)  # 14 x 14 x 64
+        d = Conv2D(32, (3, 3), activation=self.activation, padding='same')(d)  # 7 x 7 x 64
+        d = BatchNormalization()(d)
+        d = UpSampling2D((2, 2))(d)  # 28 x 28 x 32
+        d = Conv2D(self.input_shape[2], (3, 3), activation='sigmoid',
+                   padding='same',
+                   name=constants.Models.DECODED_OUT)(d)  # 28 x 28 x 1
+        return d
+
+    def get_fully_connected(self, enco: layers.Layer):
+        flat = Flatten()(enco)
+        den = Dense(64, activation='relu') (flat)
+        den = Dropout(0.3)(den)
+        out = Dense(self.number_of_classes, activation='softmax', name=constants.Models.CLASSIFIER_OUT)(den)
+        return out
+
+    def create_by_object(self):
+        input_shape = Input(shape=self.input_shape, name=constants.Models.INPUT_SHAPE)
+        encoder = Model(inputs=input_shape, outputs=self.get_encoder(input_shape), name='ENCODER')
+        encoder_output_shape = Input(shape=encoder.output.shape[1:], name='DECODER_INPUT')
+        decoder = Model(inputs=encoder_output_shape, outputs=self.get_decoder(encoder_output_shape), name='DECODER')
+        classifier_head = Model(inputs=encoder_output_shape, outputs=self.get_fully_connected(encoder_output_shape),
+                                name='CLASSIFIER_HEAD')
+        autoencoder = Sequential([encoder, decoder], name=constants.Models.DECODED_OUT)
+        classifier = Sequential([encoder, classifier_head], name=constants.Models.CLASSIFIER_OUT)
+        auto_classifier = Model(inputs=input_shape, outputs=[autoencoder(input_shape), classifier(input_shape)],
+                                name='auto_classifier')
+        return Models(autoencoder, classifier, auto_classifier)
+
+
+    def create_models(self) -> Models:
+        input_shape = Input(shape=self.input_shape, name=constants.Models.INPUT_SHAPE)
+        encoder = self.get_encoder(input_shape)
+        decoder_output = self.get_decoder(encoder)
+        autoencoder = Model(input_shape, decoder_output, name=constants.Models.AUTOENCODER)
+        fully_connected_output = self.get_fully_connected(encoder)
+        classifier = Model(input_shape, fully_connected_output, name=constants.Models.CLASSIFIER)
+        auto_classifier = Model(inputs=input_shape, outputs=[autoencoder.outputs, fully_connected_output],
+                                name=constants.Models.AUTO_CLASSIFIER)
+
+        models = Models(autoencoder, classifier, auto_classifier)
+        return models
+
+    @staticmethod
+    def from_dataset(dataset: Dataset):
+        return SmallModelBuilder(input_shape=dataset.get_input_shape(),
+                                 number_of_classes=dataset.get_number_of_classes())
+
 class BasicModelBuilder:
 
     def __init__(self, input_shape, number_of_classes: int):
@@ -88,40 +156,36 @@ class BasicModelBuilder:
         # encoder
         # input = 28 x 28 x 1 (wide and thin)
         #e = BatchNormalization()(input_img)
-        e = Conv2D(32, (3, 3), activation=self.activation, padding='same')(input_img)  # 28 x 28 x 32
+        e = Conv2D(32, (3, 3), activation='relu', padding='same')(input_img)  # 28 x 28 x 32
         e = BatchNormalization()(e)
-        e = Conv2D(32, (3, 3), activation=self.activation, padding='same')(e)
+        e = Conv2D(32, (3, 3), activation='relu', padding='same')(e)
         e = BatchNormalization()(e)
         e = MaxPooling2D(pool_size=(2, 2))(e)  # 14 x 14 x 32
         e = Dropout(0.1) (e)
-        # e = Conv2D(64, (3, 3), activation=activation, padding='same')(e) #14 x 14 x 64
-        # e = BatchNormalization()(e)
-        e = Conv2D(64, (3, 3), activation=self.activation, padding='same')(e)
+        e = Conv2D(64, (3, 3), activation='relu', padding='same')(e)
         e = BatchNormalization()(e)
         e = MaxPooling2D(pool_size=(2, 2))(e)  # 7 x 7 x 64
         e = Dropout(0.1)(e)
-        e = Conv2D(64, (3, 3), activation=self.activation, padding='same')(e)  # 7 x 7 x 64 (small and thick)
+        e = Conv2D(64, (3, 3), activation='relu', padding='same')(e)  # 7 x 7 x 64 (small and thick)
         e = BatchNormalization(name=constants.Models.ENCODED_OUT)(e)
         print('Nove OK')
         return e
 
     def get_decoder(self, encoded):
         # decoder
-        d = Conv2D(64, (3, 3), activation=self.activation, padding='same')(encoded)
+        d = Conv2D(64, (3, 3), activation='relu', padding='same')(encoded)
         d = BatchNormalization()(d)
         d = UpSampling2D((2, 2))(d)  # 14 x 14 x 64
-        d = Conv2D(64, (3, 3), activation=self.activation, padding='same')(d)  # 7 x 7 x 64
+        d = Conv2D(64, (3, 3), activation='relu', padding='same')(d)
         d = BatchNormalization()(d)
-        d = Conv2D(32, (3, 3), activation=self.activation, padding='same')(d)
+        d = Conv2D(32, (3, 3), activation='relu', padding='same')(d)
         d = BatchNormalization()(d)
         d = UpSampling2D((2, 2))(d)  # 28 x 28 x 32
-        # d = Conv2D(32, (3, 3), activation=activation, padding='same')(d) # 14 x 14 x 32
-        # d = BatchNormalization()(d)
-        d = Conv2D(32, (3, 3), activation=self.activation, padding='same')(d)
+        d = Conv2D(32, (3, 3), activation='relu', padding='same')(d)
         d = BatchNormalization()(d)
         d = Conv2D(self.input_shape[2], (3, 3), activation='sigmoid',
                    padding='same',
-                   name=constants.Models.DECODED_OUT)(d)  # 28 x 28 x 1
+                   name=constants.Models.DECODED_OUT)(d)
         return d
 
     def get_fully_connected(self, enco: layers.Layer):
@@ -133,7 +197,7 @@ class BasicModelBuilder:
         #den = Dropout(0.4)(den)
         out = Dense(self.number_of_classes, activation='softmax', name=constants.Models.CLASSIFIER_OUT)(den)
 
-        # convolution = Conv2D(64, (7, 7), activation=self.activation) (enco)
+        # convolution = Conv2D(64, (7, 7), activation='relu') (enco)
         # #den = Dense(64, activation='relu')(flat)
         # # den = Dense(64, activation='relu')(flat)
         # convolution = Dropout(0.5)(convolution)
@@ -186,6 +250,11 @@ class ModelProviderBase(ABC):
     def __call__(self, *args, **kwargs) -> Models:
         pass
 
+class SmallModelProvider(ModelProviderBase):
+
+    def __call__(self, dataset: Dataset, **ignore) -> Models:
+        models = SmallModelBuilder.from_dataset(dataset).create_models()
+        return models
 
 class BasicModelProvider(ModelProviderBase):
 
