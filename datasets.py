@@ -9,6 +9,16 @@ import constants
 
 from typing import List, Tuple, Callable
 
+
+class Singleton(object):
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super().__new__(cls, *args, **kwargs)
+        return cls._instance
+
+
 class Dataset(ABC):
 
     def __init__(self):
@@ -51,10 +61,10 @@ class Dataset(ABC):
         pass
 
     def get_train_label_class_name(self, picture_index) -> str:
-      return self.get_classes_names()[self.get_train_labels()[picture_index]]
+        return self.get_classes_names()[self.get_train_labels()[picture_index]]
 
-    def get_test_label_class_name(self, picture_index) ->str:
-      return self.get_classes_names()[self.get_test_labels()[picture_index]]
+    def get_test_label_class_name(self, picture_index) -> str:
+        return self.get_classes_names()[self.get_test_labels()[picture_index]]
 
     def get_test_labels_one_hot(self) -> np.ndarray:
         return keras.utils.to_categorical(self.get_test_labels(), self.get_number_of_classes())
@@ -70,18 +80,23 @@ class Dataset(ABC):
         else:
             return image
 
-    
 
-class KerasDataset(Dataset):
+class KerasDataset(Dataset, Singleton):
 
     def __init__(self, load_function):
         super().__init__()
         (self.train_images, self.train_labels), (self.test_images, self.test_labels) = load_function()
         self.preprocess_images()
+        self.train_images.setflags(write=False)
+        self.train_labels.setflags(write=False)
+        self.test_images.setflags(write=False)
+        self.test_labels.setflags(write=False)
 
     def preprocess_images(self) -> None:
-        self.train_images = self.train_images.reshape(self.train_images.shape[0], self.train_images.shape[1], self.train_images.shape[2], -1)
-        self.test_images = self.test_images.reshape(self.test_images.shape[0], self.test_images.shape[1], self.test_images.shape[2], -1)
+        self.train_images = self.train_images.reshape(self.train_images.shape[0], self.train_images.shape[1],
+                                                      self.train_images.shape[2], -1)
+        self.test_images = self.test_images.reshape(self.test_images.shape[0], self.test_images.shape[1],
+                                                    self.test_images.shape[2], -1)
 
         self.train_images = self.train_images / 255.0
         self.test_images = self.test_images / 255.0
@@ -114,6 +129,7 @@ class MnistDataset(KerasDataset):
     def get_dataset_name(self) -> str:
         return constants.Datasets.MNIST
 
+
 class FashionMnistDataset(KerasDataset):
 
     def __init__(self):
@@ -145,7 +161,6 @@ class Cifar10Dataset(KerasDataset):
         return constants.Datasets.CIFAR_10
 
 
-
 class DatasetFactory:
 
     def __init__(self):
@@ -154,7 +169,7 @@ class DatasetFactory:
         self.register_dataset(constants.Datasets.FASHION_MNIST, FashionMnistDataset)
         self.register_dataset(constants.Datasets.CIFAR_10, Cifar10Dataset)
 
-    def register_dataset(self, name : str, maker):
+    def register_dataset(self, name: str, maker):
         self.dataset_makers[name] = maker
 
     def make_dataset(self, type) -> Dataset:
@@ -166,6 +181,7 @@ class DatasetFactory:
 
 DatasetProvider = Callable[[], Dataset]
 
+
 class DatasetProviderClass():
 
     def __init__(self, provider: DatasetProvider):
@@ -173,4 +189,3 @@ class DatasetProviderClass():
 
     def __call__(self) -> Dataset:
         return self.provider()
-
