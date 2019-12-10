@@ -130,7 +130,7 @@ class ExperimentBase(ABC):
                     if any(path is None for path in paths_to_models):
                         continue
 
-                    def provide_existing_model() -> Models:
+                    def provide_existing_model(**ignore) -> Models:
                         model_list = [keras.models.load_model(path_to_model) for path_to_model in paths_to_models]
                         models: Models = Models(*model_list)
                         return models
@@ -296,19 +296,19 @@ class ExperimentClassifier(ExperimentBase):
         models: Models = self.model_provider(dataset=dataset)
         train_data: BasicTrainingData = self.train_data_provider(dataset=dataset,
                                                                  train_data_rate=parameters.train_data_rate)
-        autoencoder = models.autoencoder
+
         classifier = models.classifier
         validation_data = train_data.validation_data if parameters.validate else None
 
-        autoencoder.set_autoencoder_trainable(parameters.autoencoder_layers_trainable_during_classifier_training)
-        print('Autoencoder trainable weights: ', len(autoencoder.trainable_weights))
+        models.set_encoder_layers_trainable(parameters.autoencoder_layers_trainable_during_classifier_training)
+        print('Classifier trainable weights: ', len(classifier.trainable_weights))
         history_classifier: TrainHistoryModel = ExperimentBase.create_train_history_model_from_training(
             classifier.fit(x=train_data.x, y=train_data.y,
                            validation_data=validation_data, callbacks=callbacks,
                            epochs=parameters.epochs, batch_size=parameters.batch_size, verbose=2),
             early_stopping, parameters
         )
-        autoencoder.set_autoencoder_trainable(True)
+        models.set_encoder_layers_trainable(True)
         result = self.process_experiment_training(dataset, parameters, models, [history_classifier])
         return models, result
 
@@ -342,6 +342,17 @@ class ExperimentClassifier(ExperimentBase):
         predictions = np.argmax(predictions, axis=1)
         #predictions = predictions.astype('uint8')
         correct = [predictions[i] == value for i, value in enumerate(dataset.get_test_labels())]
+        print("Correct: {}".format(correct.count(True)))
+        return predictions_out
+
+    @staticmethod
+    def predict_train(dataset: Dataset, models: Models):
+        predictions = models.classifier.predict(dataset.get_train_images(), verbose=2)
+        predictions_out = predictions.copy()
+
+        predictions = np.argmax(predictions, axis=1)
+        # predictions = predictions.astype('uint8')
+        correct = [predictions[i] == value for i, value in enumerate(dataset.get_train_labels())]
         print("Correct: {}".format(correct.count(True)))
         return predictions_out
 
@@ -419,7 +430,7 @@ class ExperimentAutoencoderAndClassifier(ExperimentBase):
                 train_history_autoencoder.add_history_dict(local_history_autoencoder.history)
 
             if True:  # aby sa mi nahodou nebili premenne
-                autoencoder.set_autoencoder_trainable(
+                models.set_encoder_layers_trainable(
                     parameters.autoencoder_layers_trainable_during_classifier_training)
                 epoch_classifier_start = cycle * parameters_classifier.epochs + 1
                 local_history_classifier = classifier.fit(x=train_data.training_data_classifier.x,
@@ -438,7 +449,7 @@ class ExperimentAutoencoderAndClassifier(ExperimentBase):
                     weight_info_classifier.weights_classifier = classifier.get_weights()
 
                 train_history_classifier.add_history_dict(local_history_classifier.history)
-                autoencoder.set_autoencoder_trainable(True)
+                models.set_encoder_layers_trainable(True)
 
         autoencoder.set_weights(weight_info_classifier.weights_autoencoder)
         classifier.set_weights(weight_info_classifier.weights_classifier)
