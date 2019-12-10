@@ -18,5 +18,5 @@ class Config():
         GPU_CONFIG = constants.GpuConfig.CONTINOUS_GROWTH
     else:
         GPU_CONFIG = constants.GpuConfig.LIMIT
-    GPU_LIMIT = 768
+    GPU_LIMIT = 1024
 
