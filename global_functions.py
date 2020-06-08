@@ -1,6 +1,8 @@
 from functools import wraps
+
 import constants
 from config import Config
+
 
 def execute_before(function_to_run_before, *args_f, **kwargs_f):
     def decorator(function):
@@ -8,7 +10,9 @@ def execute_before(function_to_run_before, *args_f, **kwargs_f):
         def wrapper(*args, **kwargs):
             function_to_run_before(*args_f, **kwargs_f)
             return function(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -22,6 +26,7 @@ def run_once(f):
     wrapper.has_run = False
     return wrapper
 
+
 def auto_str_repr(cls):
     def __str__(self):
         return '%s(%s)' % (
@@ -33,24 +38,6 @@ def auto_str_repr(cls):
     cls.__repr__ = __str__
     return cls
 
-
-def bind_method_to_instance(instance, method):
-    def binding_scope_fn(*args, **kwargs):
-        return method(instance, *args, **kwargs)
-
-    return binding_scope_fn
-
-
-def print_function_arguments(f):
-    def wrapper(*args, **kwargs):
-        import inspect
-        bound_args = inspect.signature(f).bind(*args, **kwargs)
-        bound_args.apply_defaults()
-        print(dict(bound_args.arguments))
-        return f(*args, **kwargs)
-    return wrapper
-
-
 @run_once
 def on_start():
     import os
@@ -59,8 +46,8 @@ def on_start():
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
     if Config.IS_COLAB:
         pass
-        #!pip install tensorflow - gpu #2.0.0
-        #!pip install jsonpickle #1.2
+        # !pip install tensorflow - gpu #2.0.0
+        # !pip install jsonpickle #1.2
     import tensorflow as tf
     gpus = tf.config.experimental.list_physical_devices('GPU')
     if gpus:
@@ -86,16 +73,6 @@ def on_start():
 def coalesce(value, default):
     return value if value is not None else default
 
-def get_files_in_dir_with_extension(directory: str, extension: str):
-    import os
-    return [os.path.join(directory, file) for file in os.listdir(directory) if file.endswith(extension)]
-
-def remove_file(filepath):
-    import os
-    if os.path.isfile(filepath):
-        os.remove(filepath)
-    else:
-        print("Error: %s file not found" % filepath)
 
 def get_all_subclasses(cls):
     all_subclasses = []

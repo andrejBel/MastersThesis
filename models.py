@@ -1,15 +1,14 @@
-import constants
+from abc import ABC, abstractmethod
+from typing import Callable, Type
 
-from global_functions import auto_str_repr, bind_method_to_instance
-from datasets import Dataset
-
-from tensorflow.keras import datasets, layers, models, losses, optimizers
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Reshape, UpSampling2D, Input, BatchNormalization, \
+from tensorflow.keras import layers, losses, optimizers
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, UpSampling2D, Input, BatchNormalization, \
     Dense, Dropout, AveragePooling2D
 from tensorflow.keras.models import Model, Sequential
 
-from abc import ABC, abstractmethod
-from typing import Callable, Type
+import constants
+from datasets import Dataset
+from global_functions import auto_str_repr
 
 
 @auto_str_repr
@@ -45,25 +44,22 @@ class Models:
                 break
         self.compile_models()
 
+    def make_classifier_with_softmax_activation(self):
+        from tensorflow.keras import activations
+        last_layer: Dense = self.classifier.layers[-1]
+        last_layer.activation = activations.softmax
+        self.compile_models()
 
-def make_classifier_with_softmax_activation(self):
-    from tensorflow.keras import activations
-    last_layer: Dense = self.classifier.layers[-1]
-    last_layer.activation = activations.softmax
-    self.compile_models()
+    def make_classifier_with_sigmoid_activation(self):
+        from tensorflow.keras import activations
+        last_layer: Dense = self.classifier.layers[-1]
+        last_layer.activation = activations.sigmoid
+        self.compile_models()
 
-
-def make_classifier_with_sigmoid_activation(self):
-    from tensorflow.keras import activations
-    last_layer: Dense = self.classifier.layers[-1]
-    last_layer.activation = activations.sigmoid
-    self.compile_models()
-
-
-def make_classifier_without_activation(self):
-    last_layer: Dense = self.classifier.layers[-1]
-    last_layer.activation = None
-    self.compile_models()
+    def make_classifier_without_activation(self):
+        last_layer: Dense = self.classifier.layers[-1]
+        last_layer.activation = None
+        self.compile_models()
 
 
 class ModelBuilder(ABC):
@@ -191,6 +187,30 @@ class BasicModelBuilder(ModelBuilder):
         return ModelProviderBuilder(BasicModelBuilder)
 
 
+class BasicModelBuilderDecorderWithoutSigmoidActivation(BasicModelBuilder):
+
+    def get_decoder(self, encoded):
+        # decoder
+        d = Conv2D(64, (3, 3), activation='relu', padding='same')(encoded)
+        d = BatchNormalization()(d)
+        d = UpSampling2D((2, 2))(d)  # 14 x 14 x 64
+        d = Conv2D(64, (3, 3), activation='relu', padding='same')(d)
+        d = BatchNormalization()(d)
+        d = Conv2D(32, (3, 3), activation='relu', padding='same')(d)
+        d = BatchNormalization()(d)
+        d = UpSampling2D((2, 2))(d)  # 28 x 28 x 32
+        d = Conv2D(32, (3, 3), activation='relu', padding='same')(d)
+        d = BatchNormalization()(d)
+        d = Conv2D(self.input_shape[2], (3, 3),
+                   padding='same',
+                   name=constants.Models.DECODED_OUT)(d)
+        return d
+
+    @staticmethod
+    def get_provider() -> ModelProviderBase:
+        return ModelProviderBuilder(BasicModelBuilderDecorderWithoutSigmoidActivation)
+
+
 class BasicModelBuilderWithAveragePoolingWithDenseBuilder(BasicModelBuilder):
 
     def get_fully_connected(self, enco: layers.Layer):
@@ -258,6 +278,95 @@ class SmallModelBuilder(BasicModelBuilder):
     @staticmethod
     def get_provider() -> ModelProviderBase:
         return ModelProviderBuilder(SmallModelBuilder)
+
+
+class LargeModelBuilder(ModelBuilder):
+
+    def __init__(self, input_shape, number_of_classes: int):
+        super().__init__(input_shape, number_of_classes)
+        self.activation = 'relu'
+
+    # def compile_models(self, loss_weigh_decoder=1.0, loss_weight_classifier=2.0):
+    #     self.autoencoder.compile(loss=losses.binary_crossentropy, optimizer=optimizers.RMSprop())
+    #     self.classifier.compile(loss=losses.categorical_crossentropy,
+    #                             optimizer=optimizers.RMSprop(),
+    #                             metrics=['accuracy'])
+    #     self.auto_classifier.compile(
+    #         loss={constants.Models.DECODED_OUT: losses.binary_crossentropy,
+    #               constants.Models.CLASSIFIER_OUT: losses.categorical_crossentropy},
+    #         loss_weights={constants.Models.DECODED_OUT: loss_weigh_decoder,
+    #                       constants.Models.CLASSIFIER_OUT: loss_weight_classifier},
+    #         optimizers={constants.Models.DECODED_OUT: optimizers.RMSprop(),
+    #                     constants.Models.CLASSIFIER_OUT: optimizers.Adam()},
+    #         metrics=["accuracy"]
+    #     )
+
+    def get_encoder(self, input_img: Input):
+        weight_decay = 1e-4
+        e = Conv2D(32, (3, 3), padding='same',
+                   activation=self.activation)(
+            input_img)
+        e = BatchNormalization()(e)
+        e = Conv2D(32, (3, 3), padding='same',
+                   activation=self.activation)(e)
+        e = BatchNormalization()(e)
+        e = MaxPooling2D(pool_size=(2, 2))(e)
+        e = Dropout(0.2)(e)
+        e = Conv2D(64, (3, 3), padding='same',
+                   activation=self.activation)(e)
+        e = BatchNormalization()(e)
+        e = Conv2D(64, (3, 3), padding='same',
+                   activation=self.activation)(e)
+        e = BatchNormalization()(e)
+        e = MaxPooling2D(pool_size=(2, 2))(e)
+        e = Dropout(0.3)(e)
+        e = Conv2D(128, (3, 3), padding='same',
+                   activation=self.activation)(e)
+
+        e = BatchNormalization()(e)
+        e = Conv2D(128, (3, 3), padding='same',
+                   activation=self.activation)(e)
+        e = BatchNormalization()(e)
+        # e = MaxPooling2D(pool_size=(2, 2))(e)
+        e = Dropout(0.4, name=constants.Models.ENCODED_OUT)(e)
+        return e
+
+    def get_decoder(self, encoded):
+        # decoder
+        d = Conv2D(128, (3, 3), padding='same', activation=self.activation)(encoded)
+        d = BatchNormalization()(d)
+        # d = UpSampling2D((2, 2))(d)  # 14 x 14 x 64
+        d = Dropout(0.2)(d)
+        d = Conv2D(128, (3, 3), padding='same', activation=self.activation)(d)
+        d = BatchNormalization()(d)
+        d = Conv2D(64, (3, 3), padding='same', activation=self.activation)(d)
+        d = BatchNormalization()(d)
+        d = UpSampling2D((2, 2))(d)
+        d = Dropout(0.3)(d)
+        d = Conv2D(64, (3, 3), padding='same', activation=self.activation)(d)
+        d = BatchNormalization()(d)
+        d = UpSampling2D((2, 2))(d)  # 14 x 14 x 64
+        d = Dropout(0.4)(d)
+        d = Conv2D(32, (3, 3), padding='same', activation=self.activation)(d)
+        d = BatchNormalization()(d)
+        d = Conv2D(32, (3, 3), padding='same', activation=self.activation)(d)
+        d = BatchNormalization()(d)
+        d = Conv2D(self.input_shape[2], (3, 3), activation='sigmoid',
+                   padding='same',
+                   name=constants.Models.DECODED_OUT)(d)
+        return d
+
+    def get_fully_connected(self, enco: layers.Layer):
+        den = Flatten()(enco)
+        den = Dense(32, activation='relu')(den)
+        den = Dropout(0.2)(den)
+        out = Dense(self.number_of_classes, activation='softmax', name=constants.Models.CLASSIFIER_OUT)(den)
+
+        return out
+
+    @staticmethod
+    def get_provider() -> ModelProviderBase:
+        return ModelProviderBuilder(LargeModelBuilder)
 
 
 ModelProvider = Callable[..., Models]

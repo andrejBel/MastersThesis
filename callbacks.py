@@ -1,6 +1,8 @@
-from tensorflow.keras.callbacks import Callback
 import sys
+
 import numpy as np
+from tensorflow.keras.callbacks import Callback
+from tensorflow.python.platform import tf_logging as logging
 
 
 class CustomEarlyStopping(Callback):
@@ -114,7 +116,9 @@ class CustomEarlyStopping(Callback):
     def on_train_end(self, logs=None):
         if self.restore_best_weights:
             if self.verbose > 0:
-                print('Restoring model weights from the end of the best epoch: {}. Last epoch: {}. {} best value: {}.'.format(self.best_epoch + 1, self.last_epoch + 1, self.monitor, self.best))
+                print(
+                    'Restoring model weights from the end of the best epoch: {}. Last epoch: {}. {} best value: {}.'.format(
+                        self.best_epoch + 1, self.last_epoch + 1, self.monitor, self.best))
             self.model.set_weights(self.best_weights)
         if self.stopped_epoch > 0 and self.verbose > 0:
             print('Epoch %05d: early stopping' % (self.stopped_epoch + 1))

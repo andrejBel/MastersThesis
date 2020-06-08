@@ -1,15 +1,12 @@
 from typing import Callable, Optional, Union
-from global_functions import auto_str_repr
-from abc import ABC, abstractmethod
-from datasets import Dataset
+
 import numpy as np
+
 import constants
+from datasets import Dataset
+from global_functions import auto_str_repr
 
 TrainingDataProvider = Callable[..., Union['BasicTrainingData', 'TrainingDataAutoencoderClassifier']]
-
-
-class SaveInfo():  # TODO throug inheritance
-    pass
 
 
 @auto_str_repr

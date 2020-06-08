@@ -1,29 +1,26 @@
+import collections
 from abc import ABC, abstractmethod
-from tabnanny import verbose
+from datetime import datetime
+from pathlib import Path
+from typing import List, Dict, Optional, Set
+
+import jsonpickle
+import numpy as np
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 from tensorflow import keras
 
-from keras.models import Model
-from global_functions import coalesce
+from tensorflow.keras.callbacks import LearningRateScheduler
+
 import constants
-from typing import List, Dict, Optional, Set, Tuple, Any, Union
+from callbacks import CustomEarlyStopping
 from datasets import Dataset, DatasetProvider
-from pathlib import Path
-import collections
-
 from global_functions import auto_str_repr
+from global_functions import coalesce
 from models import Models, ModelProviderBase, ExistingModelProvider
-from datetime import datetime
-import jsonpickle
-import numpy as np
-
-from copy import deepcopy
 from training_data import TrainParameters, BasicTrainParametersAutoencoder, BasicTrainingData, TrainingDataProvider, \
     BasicTrainParametersTwoModels, TrainingDataAutoencoderClassifier, PossibleTrainingparameters, \
-    BasicTrainParametersClassifier, BasicTrainParametersAutoClassifier, BasicTrainingDataGeneratorAutoencoder, \
-    BasicTrainingDataGeneratorAutoClassifier, BasicTrainingDataGeneratorClassifier
-
-from callbacks import CustomEarlyStopping
+    BasicTrainParametersClassifier, BasicTrainParametersAutoClassifier
 
 
 @auto_str_repr
@@ -88,10 +85,20 @@ class ExperimentResult:
 
     def __init__(self, experiment: 'ExperimentBase',
                  train_history: TrainHistory, model_infos: List[ModelInfo]):
-        self.experiment = deepcopy(experiment)
+        # self.experiment = deepcopy(experiment)
+        self.experiment = experiment
         self.class_name = experiment.__class__.__name__
         self.train_history = train_history
         self.model_infos = model_infos
+
+
+@auto_str_repr
+class PathToModels:
+
+    def __init__(self, autoencoder_path, classifier_path, autoclassifier_path):
+        self.autoencoder_path = autoencoder_path
+        self.classifier_path = classifier_path
+        self.autoclassifier_path = autoclassifier_path
 
 
 class ExperimentBase(ABC):
@@ -126,25 +133,37 @@ class ExperimentBase(ABC):
 
             if load_whole_trained_model:
                 for experimentResult in experiment_result_list:
-                    paths_to_models = [model_info.path_to_model for model_info in experimentResult.model_infos]
-                    if any(path is None for path in paths_to_models):
+                    paths_to_models_list = [model_info.path_to_model for model_info in experimentResult.model_infos]
+                    paths_to_models = PathToModels(paths_to_models_list[0], paths_to_models_list[1],
+                                                   paths_to_models_list[2])
+                    if any(path is None for path in paths_to_models_list):
                         continue
 
-                    def provide_existing_model(**ignore) -> Models:
-                        model_list = [keras.models.load_model(path_to_model) for path_to_model in paths_to_models]
-                        models: Models = Models(*model_list)
-                        return models
+                    def supply_model_provider_with_path(paths_to_models: PathToModels):
+                        def provide_existing_model(**ignore) -> Models:
+                            autoencoder = keras.models.load_model(paths_to_models.autoencoder_path)
+                            classifier = keras.models.load_model(paths_to_models.classifier_path)
+                            autoclassifier = keras.models.load_model(paths_to_models.autoclassifier_path)
+                            models: Models = Models(autoencoder, classifier, autoclassifier)
+                            return models
 
-                    experimentResult.experiment.model_provider = provide_existing_model
+                        return provide_existing_model
+
+                    experimentResult.experiment.model_provider = supply_model_provider_with_path(paths_to_models)
 
             return experiment_result_list
         else:
             return None
 
     @staticmethod
-    def provide_existing_model_from_log(log_file, predicate_for_chosen_model_provider) -> ExistingModelProvider:
-        experiments_results: List[ExperimentResult] = ExperimentBase.load_experiment_results(log_file=log_file,
-                                                                                             load_whole_trained_model=True)
+    def provide_existing_model_from_log(log_file, predicate_for_chosen_model_provider) -> Optional[
+        ExistingModelProvider]:
+        experiments_results: Optional[List[ExperimentResult]] = ExperimentBase.load_experiment_results(
+            log_file=log_file,
+            load_whole_trained_model=True)
+        if experiments_results is None:
+            return None
+        ExperimentBase.sort_results_ascending_by_train_rate(experiments_results)
         experiment_result: ExperimentResult = predicate_for_chosen_model_provider(experiments_results)
         return ExistingModelProvider(experiment_result.experiment.model_provider)
 
@@ -196,6 +215,14 @@ class ExperimentBase(ABC):
         train_history.add_history_dict(history.history)
         return train_history
 
+    @staticmethod
+    def sort_results_ascending_by_train_rate(results: List[ExperimentResult]):
+        try:
+            results.sort(key=lambda result: result.train_history.train_parameters.train_data_rate)
+        except:
+            results.sort(key=lambda
+                result: result.train_history.train_parameters.train_parameters_classifier.train_data_rate)
+
     def process_experiment_training(self, dataset: Dataset, parameters: PossibleTrainingparameters, models: Models,
                                     train_history_model_list: List[TrainHistoryModel]) -> ExperimentResult:
         model_info_list: List[ModelInfo]
@@ -211,6 +238,10 @@ class ExperimentBase(ABC):
         if parameters.log_path is not None:
             ExperimentBase.save_experiment_result_to_file(parameters.log_path, result)
         return result
+
+    @staticmethod
+    def predicate_for_last_model():
+        return lambda experiments_results: experiments_results[-1]
 
 
 class ExperimentAutoencoder(ExperimentBase):
@@ -327,12 +358,20 @@ class ExperimentClassifier(ExperimentBase):
                                                                        constants.Metrics.VAL_ACCURACY)
 
     @staticmethod
+    def evaluate_on_train(dataset: Dataset, models: Models):
+        evaluation = models.classifier.evaluate(x=dataset.get_train_images(),
+                                                y=dataset.get_train_labels_one_hot(),
+                                                verbose=2)
+        print(evaluation)
+        return evaluation[1]  # je to na tvrdo na accuracy
+
+    @staticmethod
     def evaluate_on_test(dataset: Dataset, models: Models):
         evaluation = models.classifier.evaluate(x=dataset.get_test_images(),
                                                 y=dataset.get_test_labels_one_hot(),
                                                 verbose=2)
         print(evaluation)
-        return evaluation
+        return evaluation[1]  # je to na tvrdo na accuracy
 
     @staticmethod
     def predict_test(dataset: Dataset, models: Models):
@@ -340,7 +379,7 @@ class ExperimentClassifier(ExperimentBase):
         predictions_out = predictions.copy()
 
         predictions = np.argmax(predictions, axis=1)
-        #predictions = predictions.astype('uint8')
+        # predictions = predictions.astype('uint8')
         correct = [predictions[i] == value for i, value in enumerate(dataset.get_test_labels())]
         print("Correct: {}".format(correct.count(True)))
         return predictions_out
@@ -355,6 +394,105 @@ class ExperimentClassifier(ExperimentBase):
         correct = [predictions[i] == value for i, value in enumerate(dataset.get_train_labels())]
         print("Correct: {}".format(correct.count(True)))
         return predictions_out
+
+
+class ExperimentClassifierWithAugmentation(ExperimentClassifier):
+
+    def __init__(self, dataset_provider: DatasetProvider, model_provider: ModelProviderBase,
+                 train_data_provider: TrainingDataProvider):
+        super().__init__(dataset_provider, model_provider, train_data_provider)
+
+    def train(self, parameters: BasicTrainParametersClassifier):
+        early_stopping = ExperimentClassifier.create_early_stopping(monitor=constants.Metrics.VAL_ACCURACY,
+                                                                    patience=parameters.patience,
+                                                                    min_delta=parameters.min_delta)
+
+        def lr_schedule(epoch):
+            lrate = 0.001
+            if epoch > 75:
+                lrate = 0.0005
+            if epoch > 100:
+                lrate = 0.0003
+            return lrate
+
+        callbacks = [early_stopping, LearningRateScheduler(lr_schedule)]
+        dataset: Dataset = self.dataset_provider()
+
+        models: Models = self.model_provider(dataset=dataset)
+        train_data: BasicTrainingData = self.train_data_provider(dataset=dataset,
+                                                                 train_data_rate=parameters.train_data_rate)
+        # data augmentation
+        datagen = ImageDataGenerator(
+            featurewise_center=False,
+            samplewise_center=False,
+            featurewise_std_normalization=False,
+            samplewise_std_normalization=False,
+            zca_whitening=False,
+            rotation_range=15,
+            width_shift_range=0.1,
+            height_shift_range=0.1,
+            horizontal_flip=True,
+            vertical_flip=False
+        )
+        datagen.fit(train_data.x)
+        classifier = models.classifier
+        validation_data = train_data.validation_data if parameters.validate else None
+
+        models.set_encoder_layers_trainable(parameters.autoencoder_layers_trainable_during_classifier_training)
+        print('Classifier trainable weights: ', len(classifier.trainable_weights))
+
+        history_classifier: TrainHistoryModel = ExperimentBase.create_train_history_model_from_training(
+            classifier.fit_generator(datagen.flow(x=train_data.x, y=train_data.y, batch_size=parameters.batch_size),
+                                     steps_per_epoch=train_data.x.shape[0] // parameters.batch_size,
+                                     validation_data=validation_data, callbacks=callbacks,
+                                     epochs=parameters.epochs, verbose=2),
+            early_stopping, parameters
+        )
+        models.set_encoder_layers_trainable(True)
+        result = self.process_experiment_training(dataset, parameters, models, [history_classifier])
+        return models, result
+
+
+class ExperimentClassifierWithLearningRate(ExperimentClassifier):
+
+    def __init__(self, dataset_provider: DatasetProvider, model_provider: ModelProviderBase,
+                 train_data_provider: TrainingDataProvider):
+        super().__init__(dataset_provider, model_provider, train_data_provider)
+
+    def train(self, parameters: BasicTrainParametersClassifier):
+        early_stopping = ExperimentClassifier.create_early_stopping(monitor=constants.Metrics.VAL_ACCURACY,
+                                                                    patience=parameters.patience,
+                                                                    min_delta=parameters.min_delta)
+
+        def lr_schedule(epoch):
+            lrate = 0.001
+            if epoch > 75:
+                lrate = 0.0005
+            if epoch > 100:
+                lrate = 0.0003
+            return lrate
+
+        callbacks = [early_stopping, LearningRateScheduler(lr_schedule)]
+        dataset: Dataset = self.dataset_provider()
+
+        models: Models = self.model_provider(dataset=dataset)
+        train_data: BasicTrainingData = self.train_data_provider(dataset=dataset,
+                                                                 train_data_rate=parameters.train_data_rate)
+
+        classifier = models.classifier
+        validation_data = train_data.validation_data if parameters.validate else None
+
+        models.set_encoder_layers_trainable(parameters.autoencoder_layers_trainable_during_classifier_training)
+        print('Classifier trainable weights: ', len(classifier.trainable_weights))
+        history_classifier: TrainHistoryModel = ExperimentBase.create_train_history_model_from_training(
+            classifier.fit(x=train_data.x, y=train_data.y,
+                           validation_data=validation_data, callbacks=callbacks,
+                           epochs=parameters.epochs, batch_size=parameters.batch_size, verbose=2),
+            early_stopping, parameters
+        )
+        models.set_encoder_layers_trainable(True)
+        result = self.process_experiment_training(dataset, parameters, models, [history_classifier])
+        return models, result
 
 
 class ExperimentAutoencoderAndClassifier(ExperimentBase):
@@ -399,10 +537,10 @@ class ExperimentAutoencoderAndClassifier(ExperimentBase):
 
         class WeightInfo:
 
-            def __init__(self, monitor_value, weights_autoencoder, weights_classifier , epoch) -> None:
+            def __init__(self, monitor_value, weights_autoencoder, weights_classifier, epoch) -> None:
                 self.monitor_value = monitor_value
-                self.weights_autoencoder =weights_autoencoder
-                self. weights_classifier =  weights_classifier
+                self.weights_autoencoder = weights_autoencoder
+                self.weights_classifier = weights_classifier
                 self.epoch = epoch
 
         weight_info_autoencoder: WeightInfo = WeightInfo(0, None, None, -1)
@@ -425,7 +563,7 @@ class ExperimentAutoencoderAndClassifier(ExperimentBase):
                 if weight_info_autoencoder.monitor_value > early_stopping_autoencoder.best:
                     weight_info_autoencoder.monitor_value = early_stopping_autoencoder.best
                     weight_info_autoencoder.epoch = epoch_autoencoder_start + best_epoch_index
-                    weight_info_autoencoder.weights = autoencoder.get_weights()
+                    weight_info_autoencoder.weights_autoencoder = autoencoder.get_weights()
 
                 train_history_autoencoder.add_history_dict(local_history_autoencoder.history)
 
@@ -532,18 +670,3 @@ class ExperimentAutoClassifier(ExperimentBase):
         correct = np.where(predictions_classifier == dataset.get_test_labels())[0]
         print("Found {} correct labels".format(len(correct)))
         return predictions_auto_encoder, predictions_classifier_out
-
-
-def remove_models_without_log():
-    import global_functions
-    all_h5 = global_functions.get_files_in_dir_with_extension(constants.Paths.OUTPUT_DIRECTORY, '.h5')
-    all_json = global_functions.get_files_in_dir_with_extension(constants.Paths.OUTPUT_DIRECTORY, '.json')
-    for log_file in all_json:
-        results = ExperimentBase.load_experiment_results(log_file)
-        for result in results:
-            for model_info in result.model_infos:
-                all_h5.remove(model_info.path_to_model)
-    print(len(all_h5))
-    for to_delete in all_h5:
-        print(to_delete)
-        #global_functions.remove_file(to_delete)

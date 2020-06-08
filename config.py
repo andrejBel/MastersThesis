@@ -1,5 +1,6 @@
 import constants
 
+
 class Config():
     IS_COLAB = False
     try:
@@ -19,4 +20,3 @@ class Config():
     else:
         GPU_CONFIG = constants.GpuConfig.LIMIT
     GPU_LIMIT = 1024
-
