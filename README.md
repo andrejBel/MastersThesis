@@ -1,5 +1,10 @@
 # Master's thesis- Use of autoencoders in classification
 
+## Abstract
+The aim of master thesis is to examine the possibilities of using an autoencoder in classification tasks. In the beginning of the thesis, we design a high-level architecture for models of the autoencoder and a classifier, in which models share a common part, which can be pre-trained for classifier by autoencoder. Based on architecture we proposed several approaches to the training of the autoencoder and the classifier, where the basic concept is to pre-train the autoencoder for later training of the classifier. The usefulness of using an autoencoder is based on the assumption that we can pre-train the autoencoder on unannotated data, which is usually much easier to obtain than annotated data.
+On trained models, we examine how the use of the autoencoder affects the accuracy of classification, how the amount of annotated data affects the accuracy and we compare the results with the traditional approach to classifier training. The results indicate that the use of the autoencoder makes sense only with an extremely low amount of training data - about 600 samples in a training set for datasets we examine. In other cases, the standard approach to the training achieved the same if not better accuracy than the proposed approaches to the training.
+In the last part of the thesis, we will suggest and implement methods for marking input data as unknown, where we observe an effect of the autoencoder on the robustness against unknown data. The first one uses the autoencoder’s reconstruction error and the second one uses the output from the modified classifier. In general, none of proposed methods can be recommended, but the latter indicates very good results under certain conditions, where more than 90% of the data from unknown datasets were correctly identified as unknown.
+
 ## How to run
 Python version 3.6 or higher
 ```
